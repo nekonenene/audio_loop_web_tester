@@ -332,7 +332,11 @@
 
       // ---------- File Loading ----------
       function loadFile(file){
-        if(!audioCtx){ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); gainNode = audioCtx.createGain(); gainNode.connect(audioCtx.destination); }
+        if(!audioCtx){
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          gainNode = audioCtx.createGain();
+          gainNode.connect(audioCtx.destination);
+        }
 
         const reader = new FileReader();
         reader.onload = () => {
@@ -340,9 +344,24 @@
             audioBuffer = buf; duration = buf.duration; pauseOffset = 0; player.style.display='flex';
             timeDisplay.textContent = formatTime(0)+' / '+formatTime(duration);
             drawSeekbar(0);
-            createAndStartSource(0);
-            playPauseBtn.disabled=false;
-            playPauseBtn.textContent='⏸';
+
+            // Safari対応: AudioContextの状態をチェックして必要ならresumeしてから再生
+            if(audioCtx.state === 'suspended') {
+              audioCtx.resume().then(() => {
+                createAndStartSource(0);
+                playPauseBtn.disabled=false;
+                playPauseBtn.textContent='⏸';
+              }).catch(err => {
+                console.log('AudioContext resume failed: ', err);
+                // 自動再生できない場合はボタンを「再生可能」な状態にしておく
+                playPauseBtn.disabled=false;
+                playPauseBtn.textContent='▶︎';
+              });
+            } else {
+              createAndStartSource(0);
+              playPauseBtn.disabled=false;
+              playPauseBtn.textContent='⏸';
+            }
           }).catch(()=>alert('ファイルをデコードできませんでした'));
         };
         reader.readAsArrayBuffer(file);
