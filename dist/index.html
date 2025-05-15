@@ -324,30 +324,30 @@
       let pauseOffset = 0; // seconds into buffer when paused
 
       // ---------- Drag & Drop Handlers ----------
-      ['dragenter', 'dragover'].forEach(ev => dropzone.addEventListener(ev, e => {
-        e.preventDefault();
+      ['dragenter', 'dragover'].forEach(eventName => dropzone.addEventListener(eventName, event => {
+        event.preventDefault();
         dropzone.classList.add('hover');
       }));
 
-      ['dragleave', 'drop'].forEach(ev => dropzone.addEventListener(ev, e => {
-        e.preventDefault();
+      ['dragleave', 'drop'].forEach(eventName => dropzone.addEventListener(eventName, event => {
+        event.preventDefault();
         dropzone.classList.remove('hover');
       }));
 
-      dropzone.addEventListener('drop', e => {
-        const f = e.dataTransfer.files[0];
-        if (f) loadFile(f);
+      dropzone.addEventListener('drop', event => {
+        const file = event.dataTransfer.files[0];
+        if (file !== undefined && file !== null) loadFile(file);
       });
 
       dropzone.addEventListener('click', () => fileInput.click());
 
       fileInput.addEventListener('change', () => {
-        if (fileInput.files[0]) loadFile(fileInput.files[0]);
+        if (fileInput.files[0] !== undefined && fileInput.files[0] !== null) loadFile(fileInput.files[0]);
       });
 
       // ---------- File Loading ----------
       function loadFile(file) {
-        if (!audioCtx) {
+        if (audioCtx === undefined || audioCtx === null) {
           audioCtx = new (window.AudioContext || window.webkitAudioContext)();
           gainNode = audioCtx.createGain();
           gainNode.connect(audioCtx.destination);
@@ -386,10 +386,10 @@
       }
 
       function createAndStartSource(offset) {
-        if (source) {
+        if (source !== undefined && source !== null) {
           try {
             source.stop();
-          } catch (e) {
+          } catch (error) {
             // Ignore error if source already stopped
           }
           source.disconnect();
@@ -411,7 +411,7 @@
 
       // ---------- Controls ----------
       playPauseBtn.addEventListener('click', () => {
-        if (!audioBuffer) return;
+        if (audioBuffer === undefined || audioBuffer === null) return;
 
         if (isPlaying) {
           source.stop();
@@ -426,11 +426,11 @@
       });
 
       volumeSlider.addEventListener('input', () => {
-        if (gainNode) gainNode.gain.value = parseFloat(volumeSlider.value);
+        if (gainNode !== undefined && gainNode !== null) gainNode.gain.value = parseFloat(volumeSlider.value);
       });
 
       loopToggle.addEventListener('change', () => {
-        if (source) source.loop = loopToggle.checked;
+        if (source !== undefined && source !== null) source.loop = loopToggle.checked;
       });
 
       // ---------- Playback Speed Control ----------
@@ -470,11 +470,11 @@
       });
 
       // ---------- Seekbar Interaction ----------
-      seekbar.addEventListener('click', e => {
-        if (!audioBuffer) return;
+      seekbar.addEventListener('click', event => {
+        if (audioBuffer === undefined || audioBuffer === null) return;
 
         const rect = seekbar.getBoundingClientRect();
-        const ratio = (e.clientX - rect.left) / rect.width;
+        const ratio = (event.clientX - rect.left) / rect.width;
         // クリックした位置の再生時間を計算（再生速度に関係なく絶対位置）
         const newPosition = ratio * duration;
 
