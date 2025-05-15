@@ -211,130 +211,116 @@
 
     <input id="fileInput" type="file" accept="audio/*" hidden />
 
+    <footer>© 2025 ハトネコエ （X: <a href="https://x.com/nekonenene" target="_blank" rel="noopener noreferrer">@nekonenene</a>）</footer>
+
     <script>
-      const dropzone = document.getElementById("dropzone");
-      const fileInput = document.getElementById("fileInput");
-      const player = document.getElementById("player");
-      const playPauseBtn = document.getElementById("playPause");
-      const seekbar = document.getElementById("seekbar");
-      const ctx = seekbar.getContext("2d");
-      const timeDisplay = document.getElementById("timeDisplay");
-      const volumeSlider = document.getElementById("volume");
-      const loopToggle = document.getElementById("loopToggle");
+      const dropzone = document.getElementById('dropzone');
+      const fileInput = document.getElementById('fileInput');
+      const player = document.getElementById('player');
+      const playPauseBtn = document.getElementById('playPause');
+      const seekbar = document.getElementById('seekbar');
+      const ctx = seekbar.getContext('2d');
+      const timeDisplay = document.getElementById('timeDisplay');
+      const volumeSlider = document.getElementById('volume');
+      const loopToggle = document.getElementById('loopToggle');
 
-      let audio = null;
+      // Web Audio API objects
+      let audioCtx = null;
+      let gainNode = null;
+      let audioBuffer = null;
+      let source = null;
+
+      // Playback state
       let duration = 0;
-      let rafId = null;
+      let isPlaying = false;
+      let startTime = 0;   // context currentTime when playback started
+      let pauseOffset = 0; // seconds into buffer when paused
 
-      // ---------- Drag & Drop Helpers ----------
-      ["dragenter", "dragover"].forEach((event) => {
-        dropzone.addEventListener(event, (e) => {
-          e.preventDefault();
-          dropzone.classList.add("hover");
-        });
-      });
-      ["dragleave", "drop"].forEach((event) => {
-        dropzone.addEventListener(event, (e) => {
-          e.preventDefault();
-          dropzone.classList.remove("hover");
-        });
-      });
-      dropzone.addEventListener("drop", (e) => {
-        const file = e.dataTransfer.files[0];
-        if (file) loadFile(file);
-      });
-      dropzone.addEventListener("click", () => fileInput.click());
-      fileInput.addEventListener("change", () => {
-        if (fileInput.files[0]) loadFile(fileInput.files[0]);
-      });
+      // ---------- Drag & Drop Handlers ----------
+      ['dragenter','dragover'].forEach(ev=>dropzone.addEventListener(ev,e=>{e.preventDefault();dropzone.classList.add('hover');}));
+      ['dragleave','drop'].forEach(ev=>dropzone.addEventListener(ev,e=>{e.preventDefault();dropzone.classList.remove('hover');}));
+      dropzone.addEventListener('drop',e=>{const f=e.dataTransfer.files[0]; if(f) loadFile(f);});
+      dropzone.addEventListener('click',()=>fileInput.click());
+      fileInput.addEventListener('change',()=>{if(fileInput.files[0]) loadFile(fileInput.files[0]);});
 
-      // ---------- File Load ----------
-      function loadFile(file) {
-        if (audio) {
-          audio.pause();
-          cancelAnimationFrame(rafId);
-        }
+      // ---------- File Loading ----------
+      function loadFile(file){
+        if(!audioCtx){ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); gainNode = audioCtx.createGain(); gainNode.connect(audioCtx.destination); }
 
-        audio = new Audio(URL.createObjectURL(file));
-        audio.loop = loopToggle.checked;
-        audio.volume = parseFloat(volumeSlider.value);
-        playPauseBtn.disabled = true;
-        playPauseBtn.textContent = "⏳";
-        player.style.display = "flex";
+        const reader = new FileReader();
+        reader.onload = () => {
+          audioCtx.decodeAudioData(reader.result).then(buf=>{
+            audioBuffer = buf; duration = buf.duration; pauseOffset = 0; player.style.display='flex';
+            timeDisplay.textContent = formatTime(0)+' / '+formatTime(duration);
+            drawSeekbar(0);
+            createAndStartSource(0);
+            playPauseBtn.disabled=false;
+            playPauseBtn.textContent='⏸';
+          }).catch(()=>alert('ファイルをデコードできませんでした'));
+        };
+        reader.readAsArrayBuffer(file);
+      }
 
-        audio.addEventListener("loadedmetadata", () => {
-          duration = audio.duration;
-          timeDisplay.textContent = formatTime(0) + " / " + formatTime(duration);
-          drawSeekbar(0);
-          playPauseBtn.disabled = false;
-          playPauseBtn.textContent = "⏸";
-          audio.play(); // ---------- Autoplay ----------
-        });
-
-        audio.addEventListener("play", () => {
-          playPauseBtn.textContent = "⏸";
-          updateProgress();
-        });
-
-        audio.addEventListener("pause", () => {
-          playPauseBtn.textContent = "▶︎";
-          cancelAnimationFrame(rafId);
-        });
-
-        audio.addEventListener("ended", () => {
-          playPauseBtn.textContent = "▶︎";
-        });
+      function createAndStartSource(offset){
+        if(source){ try{source.stop();}catch(e){} source.disconnect(); }
+        source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.loop = loopToggle.checked;
+        source.connect(gainNode);
+        startTime = audioCtx.currentTime - offset;
+        source.start(0, offset);
+        isPlaying = true;
+        updateProgress();
       }
 
       // ---------- Controls ----------
-      playPauseBtn.addEventListener("click", () => {
-        if (!audio) return;
-        audio.paused ? audio.play() : audio.pause();
+      playPauseBtn.addEventListener('click',()=>{
+        if(!audioBuffer) return;
+        if(isPlaying){
+          source.stop();
+          pauseOffset = audioCtx.currentTime - startTime;
+          isPlaying = false;
+          playPauseBtn.textContent='▶︎';
+        }else{
+          createAndStartSource(pauseOffset % duration);
+          playPauseBtn.textContent='⏸';
+        }
       });
 
-      volumeSlider.addEventListener("input", () => {
-        if (audio) audio.volume = parseFloat(volumeSlider.value);
+      volumeSlider.addEventListener('input',()=>{ if(gainNode) gainNode.gain.value = parseFloat(volumeSlider.value); });
+      loopToggle.addEventListener('change',()=>{ if(source) source.loop = loopToggle.checked; });
+
+      // ---------- Seekbar Interaction ----------
+      seekbar.addEventListener('click',e=>{
+        if(!audioBuffer) return;
+        const rect = seekbar.getBoundingClientRect();
+        const ratio = (e.clientX - rect.left) / rect.width;
+        pauseOffset = ratio * duration;
+        if(isPlaying){ createAndStartSource(pauseOffset); }
+        else { drawSeekbar(ratio); timeDisplay.textContent = formatTime(pauseOffset)+' / '+formatTime(duration); }
       });
 
-      loopToggle.addEventListener("change", () => {
-        if (audio) audio.loop = loopToggle.checked;
-      });
-
-      // ---------- Seekbar Rendering ----------
-      function drawSeekbar(progress) {
-        const w = seekbar.width;
-        const h = seekbar.height;
-        ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = "#ccc";
-        ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = "#1e90ff";
-        ctx.fillRect(0, 0, w * progress, h);
-      }
-
-      function updateProgress() {
-        if (!audio) return;
-        const current = audio.currentTime % duration;
+      // ---------- Progress Rendering ----------
+      let rafId=null;
+      function updateProgress(){
+        if(!isPlaying){ cancelAnimationFrame(rafId); return; }
+        const current = (audioCtx.currentTime - startTime) % duration;
         const progress = current / duration;
         drawSeekbar(progress);
-        timeDisplay.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
+        timeDisplay.textContent = formatTime(current)+' / '+formatTime(duration);
         rafId = requestAnimationFrame(updateProgress);
       }
 
-      // ---------- Seek Interaction ----------
-      seekbar.addEventListener("click", (e) => {
-        if (!audio || !duration) return;
-        const rect = seekbar.getBoundingClientRect();
-        const ratio = (e.clientX - rect.left) / rect.width;
-        audio.currentTime = duration * ratio;
-        if (audio.paused) drawSeekbar(ratio);
-      });
+      function drawSeekbar(progress){
+        const w = seekbar.width; const h = seekbar.height;
+        ctx.clearRect(0,0,w,h);
+        ctx.fillStyle='#ccc'; ctx.fillRect(0,0,w,h);
+        ctx.fillStyle='#1e90ff'; ctx.fillRect(0,0,w*progress,h);
+      }
 
-      // ---------- Utils ----------
-      function formatTime(sec) {
-        const m = Math.floor(sec / 60);
-        const s = Math.floor(sec % 60)
-          .toString()
-          .padStart(2, "0");
+      // ---------- Utility ----------
+      function formatTime(sec){
+        const m = Math.floor(sec/60); const s = Math.floor(sec%60).toString().padStart(2,'0');
         return `${m}:${s}`;
       }
     </script>
