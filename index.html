@@ -65,6 +65,7 @@
         align-items: center;
         gap: 0.75rem;
         flex-wrap: wrap;
+        padding: 0 0.5rem;
       }
       #seekbar {
         flex: 1 1 auto;
@@ -72,9 +73,10 @@
         border-radius: 4px;
         background: #ddd;
         cursor: pointer;
+        min-width: 0; /* Prevent flex item from overflowing */
       }
       #timeDisplay {
-        min-width: 140px;
+        min-width: 90px;
         text-align: right;
         font-variant-numeric: tabular-nums;
       }
@@ -95,6 +97,7 @@
       /* ---------- Range Slider Styling ---------- */
       input[type="range"] {
         -webkit-appearance: none;
+        appearance: none;
         width: 100px;
         height: 6px;
         border-radius: 3px;
@@ -163,6 +166,7 @@
         display: flex;
         align-items: center;
         gap: 0.3rem;
+        margin: 0.2rem 0;
       }
       .loopLabel {
         font-size: 0.9rem;
@@ -175,6 +179,42 @@
       footer a {
         color: #1e90ff;
         text-decoration: none;
+      }
+
+      /* Responsive styles for mobile */
+      @media (max-width: 600px) {
+        body {
+          padding: 1rem;
+        }
+        #player {
+          gap: 0.4rem;
+        }
+        #timeDisplay {
+          min-width: 80px;
+          font-size: 0.9rem;
+        }
+        button {
+          padding: 0.45rem 0.75rem;
+        }
+        .control {
+          flex-basis: 45%;
+          justify-content: center;
+        }
+        /* Arrange elements in a more mobile-friendly layout */
+        #player {
+          justify-content: center;
+        }
+        #seekbar {
+          order: 3;
+          flex-basis: 100%;
+          margin-top: 0.3rem;
+        }
+        #timeDisplay {
+          order: 4;
+          flex-basis: 100%;
+          text-align: center;
+          margin-top: 0.2rem;
+        }
       }
     </style>
   </head>
