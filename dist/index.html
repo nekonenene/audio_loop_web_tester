@@ -287,7 +287,7 @@
 
       <span class="control speed-control">
         <span class="speedLabel">速度: <span id="speedValue">1.0x</span></span>
-        <input id="speedSlider" type="range" min="0.1" max="3" step="0.1" value="1" />
+        <input id="speedSlider" type="range" min="0.1" max="2" step="0.1" value="1" />
         <button id="resetSpeed" title="1倍速に戻す">1x</button>
       </span>
     </div>
@@ -355,7 +355,9 @@
         source.loop = loopToggle.checked;
         source.playbackRate.value = playbackRate;
         source.connect(gainNode);
-        startTime = audioCtx.currentTime - offset;
+        // offset はバッファ内の位置（秒数）で、再生速度に関係なく一定
+        startTime = audioCtx.currentTime;
+        pauseOffset = offset;
         source.start(0, offset);
         isPlaying = true;
         updateProgress();
@@ -366,12 +368,12 @@
         if(!audioBuffer) return;
         if(isPlaying){
           source.stop();
-          // 再生速度を考慮した一時停止位置を計算
-          pauseOffset = playbackRate * (audioCtx.currentTime - startTime);
+          // 一時停止位置を現在の再生位置に更新
+          pauseOffset = (pauseOffset + playbackRate * (audioCtx.currentTime - startTime)) % duration;
           isPlaying = false;
           playPauseBtn.textContent='▶︎';
         }else{
-          createAndStartSource(pauseOffset % duration);
+          createAndStartSource(pauseOffset);
           playPauseBtn.textContent='⏸';
         }
       });
@@ -381,31 +383,27 @@
 
       // ---------- Playback Speed Control ----------
       speedSlider.addEventListener('input', () => {
-        // 速度変更前の再生位置を保存
-        let currentPosition = 0;
+        // 現在の再生位置を取得（速度変更前）
+        let currentPosition = pauseOffset;
         if(isPlaying) {
-          currentPosition = playbackRate * (audioCtx.currentTime - startTime) % duration;
-        } else {
-          currentPosition = pauseOffset;
+          currentPosition = (pauseOffset + playbackRate * (audioCtx.currentTime - startTime)) % duration;
         }
 
         // 再生速度の更新
         playbackRate = parseFloat(speedSlider.value);
         speedValue.textContent = playbackRate.toFixed(1) + 'x';
 
-        // 再生中なら、現在の位置から新しい速度で再開
+        // 再生中なら、同じ位置から新しい速度で再開
         if(isPlaying) {
           createAndStartSource(currentPosition);
         }
       });
 
       resetSpeed.addEventListener('click', () => {
-        // 速度変更前の再生位置を保存
-        let currentPosition = 0;
+        // 現在の再生位置を取得
+        let currentPosition = pauseOffset;
         if(isPlaying) {
-          currentPosition = playbackRate * (audioCtx.currentTime - startTime) % duration;
-        } else {
-          currentPosition = pauseOffset;
+          currentPosition = (pauseOffset + playbackRate * (audioCtx.currentTime - startTime)) % duration;
         }
 
         // 再生速度をリセット
@@ -413,7 +411,7 @@
         speedSlider.value = 1;
         speedValue.textContent = '1.0x';
 
-        // 再生中なら、現在の位置から新しい速度で再開
+        // 再生中なら、同じ位置から新しい速度で再開
         if(isPlaying) {
           createAndStartSource(currentPosition);
         }
@@ -424,13 +422,17 @@
         if(!audioBuffer) return;
         const rect = seekbar.getBoundingClientRect();
         const ratio = (e.clientX - rect.left) / rect.width;
-        // 再生位置をオーディオバッファー内の絶対位置として計算
-        pauseOffset = ratio * duration;
+        // クリックした位置の再生時間を計算（再生速度に関係なく絶対位置）
+        const newPosition = ratio * duration;
+
         if(isPlaying){
-          createAndStartSource(pauseOffset);
+          // 再生中の場合は、新しい位置から再生を開始
+          createAndStartSource(newPosition);
         } else {
+          // 停止中の場合は、表示を更新し、次回再生時の開始位置として保存
+          pauseOffset = newPosition;
           drawSeekbar(ratio);
-          timeDisplay.textContent = formatTime(pauseOffset)+' / '+formatTime(duration);
+          timeDisplay.textContent = formatTime(newPosition)+' / '+formatTime(duration);
         }
       });
 
@@ -438,10 +440,13 @@
       let rafId=null;
       function updateProgress(){
         if(!isPlaying){ cancelAnimationFrame(rafId); return; }
-        // 再生速度を考慮した現在の再生位置を計算
+
+        // AudioBufferSourceNode は内部的に再生速度に応じた位置で再生している
+        // 再生開始からの経過時間と再生速度から現在位置を計算
         const elapsedTime = audioCtx.currentTime - startTime;
-        const current = (playbackRate * elapsedTime) % duration;
+        const current = (pauseOffset + playbackRate * elapsedTime) % duration;
         const progress = current / duration;
+
         drawSeekbar(progress);
         timeDisplay.textContent = formatTime(current)+' / '+formatTime(duration);
         rafId = requestAnimationFrame(updateProgress);
