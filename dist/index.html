@@ -324,15 +324,30 @@
       let pauseOffset = 0; // seconds into buffer when paused
 
       // ---------- Drag & Drop Handlers ----------
-      ['dragenter','dragover'].forEach(ev=>dropzone.addEventListener(ev,e=>{e.preventDefault();dropzone.classList.add('hover');}));
-      ['dragleave','drop'].forEach(ev=>dropzone.addEventListener(ev,e=>{e.preventDefault();dropzone.classList.remove('hover');}));
-      dropzone.addEventListener('drop',e=>{const f=e.dataTransfer.files[0]; if(f) loadFile(f);});
-      dropzone.addEventListener('click',()=>fileInput.click());
-      fileInput.addEventListener('change',()=>{if(fileInput.files[0]) loadFile(fileInput.files[0]);});
+      ['dragenter', 'dragover'].forEach(ev => dropzone.addEventListener(ev, e => {
+        e.preventDefault();
+        dropzone.classList.add('hover');
+      }));
+
+      ['dragleave', 'drop'].forEach(ev => dropzone.addEventListener(ev, e => {
+        e.preventDefault();
+        dropzone.classList.remove('hover');
+      }));
+
+      dropzone.addEventListener('drop', e => {
+        const f = e.dataTransfer.files[0];
+        if (f) loadFile(f);
+      });
+
+      dropzone.addEventListener('click', () => fileInput.click());
+
+      fileInput.addEventListener('change', () => {
+        if (fileInput.files[0]) loadFile(fileInput.files[0]);
+      });
 
       // ---------- File Loading ----------
-      function loadFile(file){
-        if(!audioCtx){
+      function loadFile(file) {
+        if (!audioCtx) {
           audioCtx = new (window.AudioContext || window.webkitAudioContext)();
           gainNode = audioCtx.createGain();
           gainNode.connect(audioCtx.destination);
@@ -340,40 +355,52 @@
 
         const reader = new FileReader();
         reader.onload = () => {
-          audioCtx.decodeAudioData(reader.result).then(buf=>{
-            audioBuffer = buf; duration = buf.duration; pauseOffset = 0; player.style.display='flex';
-            timeDisplay.textContent = formatTime(0)+' / '+formatTime(duration);
+          audioCtx.decodeAudioData(reader.result).then(buf => {
+            audioBuffer = buf;
+            duration = buf.duration;
+            pauseOffset = 0;
+            player.style.display = 'flex';
+            timeDisplay.textContent = formatTime(0) + ' / ' + formatTime(duration);
             drawSeekbar(0);
 
             // Safari対応: AudioContextの状態をチェックして必要ならresumeしてから再生
-            if(audioCtx.state === 'suspended') {
+            if (audioCtx.state === 'suspended') {
               audioCtx.resume().then(() => {
                 createAndStartSource(0);
-                playPauseBtn.disabled=false;
-                playPauseBtn.textContent='⏸';
+                playPauseBtn.disabled = false;
+                playPauseBtn.textContent = '⏸';
               }).catch(err => {
                 console.log('AudioContext resume failed: ', err);
                 // 自動再生できない場合はボタンを「再生可能」な状態にしておく
-                playPauseBtn.disabled=false;
-                playPauseBtn.textContent='▶︎';
+                playPauseBtn.disabled = false;
+                playPauseBtn.textContent = '▶︎';
               });
             } else {
               createAndStartSource(0);
-              playPauseBtn.disabled=false;
-              playPauseBtn.textContent='⏸';
+              playPauseBtn.disabled = false;
+              playPauseBtn.textContent = '⏸';
             }
-          }).catch(()=>alert('ファイルをデコードできませんでした'));
+          }).catch(() => alert('ファイルをデコードできませんでした'));
         };
         reader.readAsArrayBuffer(file);
       }
 
-      function createAndStartSource(offset){
-        if(source){ try{source.stop();}catch(e){} source.disconnect(); }
+      function createAndStartSource(offset) {
+        if (source) {
+          try {
+            source.stop();
+          } catch (e) {
+            // Ignore error if source already stopped
+          }
+          source.disconnect();
+        }
+
         source = audioCtx.createBufferSource();
         source.buffer = audioBuffer;
         source.loop = loopToggle.checked;
         source.playbackRate.value = playbackRate;
         source.connect(gainNode);
+
         // offset はバッファ内の位置（秒数）で、再生速度に関係なく一定
         startTime = audioCtx.currentTime;
         pauseOffset = offset;
@@ -383,28 +410,34 @@
       }
 
       // ---------- Controls ----------
-      playPauseBtn.addEventListener('click',()=>{
-        if(!audioBuffer) return;
-        if(isPlaying){
+      playPauseBtn.addEventListener('click', () => {
+        if (!audioBuffer) return;
+
+        if (isPlaying) {
           source.stop();
           // 一時停止位置を現在の再生位置に更新
           pauseOffset = (pauseOffset + playbackRate * (audioCtx.currentTime - startTime)) % duration;
           isPlaying = false;
-          playPauseBtn.textContent='▶︎';
-        }else{
+          playPauseBtn.textContent = '▶︎';
+        } else {
           createAndStartSource(pauseOffset);
-          playPauseBtn.textContent='⏸';
+          playPauseBtn.textContent = '⏸';
         }
       });
 
-      volumeSlider.addEventListener('input',()=>{ if(gainNode) gainNode.gain.value = parseFloat(volumeSlider.value); });
-      loopToggle.addEventListener('change',()=>{ if(source) source.loop = loopToggle.checked; });
+      volumeSlider.addEventListener('input', () => {
+        if (gainNode) gainNode.gain.value = parseFloat(volumeSlider.value);
+      });
+
+      loopToggle.addEventListener('change', () => {
+        if (source) source.loop = loopToggle.checked;
+      });
 
       // ---------- Playback Speed Control ----------
       speedSlider.addEventListener('input', () => {
         // 現在の再生位置を取得（速度変更前）
         let currentPosition = pauseOffset;
-        if(isPlaying) {
+        if (isPlaying) {
           currentPosition = (pauseOffset + playbackRate * (audioCtx.currentTime - startTime)) % duration;
         }
 
@@ -413,7 +446,7 @@
         speedValue.textContent = playbackRate.toFixed(1) + 'x';
 
         // 再生中なら、同じ位置から新しい速度で再開
-        if(isPlaying) {
+        if (isPlaying) {
           createAndStartSource(currentPosition);
         }
       });
@@ -421,7 +454,7 @@
       resetSpeed.addEventListener('click', () => {
         // 現在の再生位置を取得
         let currentPosition = pauseOffset;
-        if(isPlaying) {
+        if (isPlaying) {
           currentPosition = (pauseOffset + playbackRate * (audioCtx.currentTime - startTime)) % duration;
         }
 
@@ -431,34 +464,38 @@
         speedValue.textContent = '1.0x';
 
         // 再生中なら、同じ位置から新しい速度で再開
-        if(isPlaying) {
+        if (isPlaying) {
           createAndStartSource(currentPosition);
         }
       });
 
       // ---------- Seekbar Interaction ----------
-      seekbar.addEventListener('click',e=>{
-        if(!audioBuffer) return;
+      seekbar.addEventListener('click', e => {
+        if (!audioBuffer) return;
+
         const rect = seekbar.getBoundingClientRect();
         const ratio = (e.clientX - rect.left) / rect.width;
         // クリックした位置の再生時間を計算（再生速度に関係なく絶対位置）
         const newPosition = ratio * duration;
 
-        if(isPlaying){
+        if (isPlaying) {
           // 再生中の場合は、新しい位置から再生を開始
           createAndStartSource(newPosition);
         } else {
           // 停止中の場合は、表示を更新し、次回再生時の開始位置として保存
           pauseOffset = newPosition;
           drawSeekbar(ratio);
-          timeDisplay.textContent = formatTime(newPosition)+' / '+formatTime(duration);
+          timeDisplay.textContent = formatTime(newPosition) + ' / ' + formatTime(duration);
         }
       });
 
       // ---------- Progress Rendering ----------
-      let rafId=null;
-      function updateProgress(){
-        if(!isPlaying){ cancelAnimationFrame(rafId); return; }
+      let rafId = null;
+      function updateProgress() {
+        if (!isPlaying) {
+          cancelAnimationFrame(rafId);
+          return;
+        }
 
         // AudioBufferSourceNode は内部的に再生速度に応じた位置で再生している
         // 再生開始からの経過時間と再生速度から現在位置を計算
@@ -467,20 +504,24 @@
         const progress = current / duration;
 
         drawSeekbar(progress);
-        timeDisplay.textContent = formatTime(current)+' / '+formatTime(duration);
+        timeDisplay.textContent = formatTime(current) + ' / ' + formatTime(duration);
         rafId = requestAnimationFrame(updateProgress);
       }
 
-      function drawSeekbar(progress){
-        const w = seekbar.width; const h = seekbar.height;
-        ctx.clearRect(0,0,w,h);
-        ctx.fillStyle='#ccc'; ctx.fillRect(0,0,w,h);
-        ctx.fillStyle='#1e90ff'; ctx.fillRect(0,0,w*progress,h);
+      function drawSeekbar(progress) {
+        const w = seekbar.width;
+        const h = seekbar.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#ccc';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#1e90ff';
+        ctx.fillRect(0, 0, w * progress, h);
       }
 
       // ---------- Utility ----------
-      function formatTime(sec){
-        const m = Math.floor(sec/60); const s = Math.floor(sec%60).toString().padStart(2,'0');
+      function formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60).toString().padStart(2, '0');
         return `${m}:${s}`;
       }
     </script>
