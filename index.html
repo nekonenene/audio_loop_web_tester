@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WAV／OGG／MP3 オーディオループチェッカー | Audio Loop Seamless Tester</title>
+
+    <!-- SEO Primary Meta Tags -->
+    <meta name="description" content="ブラウザだけで音楽ファイルのループ再生が途切れず滑らかに繋がるか確認できる無料オンラインツール。WAV・OGG・MP3 など主要フォーマット対応" />
+    <meta name="keywords" content="audio loop tester,seamless loop checker,mp3 loop online,wav loop test,ogg loop test,loop playback test,オーディオループ,ループ再生確認,シームレスループ,音楽ループチェッカー" />
+    <meta name="author" content="ハトネコエ" />
+    <link rel="canonical" href="https://audio-loop-checker.hatone.net" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://audio-loop-checker.hatone.net" />
+    <meta property="og:title" content="WAV／OGG／MP3 オーディオループチェッカー" />
+    <meta property="og:description" content="ブラウザ上で音楽ファイルをドラッグ＆ドロップするだけで、ループ再生の切れ目をカンタンにチェック！" />
+    <!-- <meta property="og:image" content="https://audio-loop-checker.hatone.net/og-image.png" /> -->
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="WAV／OGG／MP3 オーディオループチェッカー" />
+    <meta name="twitter:description" content="ブラウザ上で音楽ファイルをドラッグ＆ドロップするだけで、ループ再生の切れ目をカンタンにチェック！" />
+    <!-- <meta name="twitter:image" content="https://audio-loop-checker.hatone.net/og-image.png" /> -->
+
+    <style>
+      * {
+        box-sizing: border-box;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        padding: 2rem;
+        background: #f5f7fa;
+      }
+      #dropzone {
+        width: 100%;
+        max-width: 620px;
+        height: 170px;
+        border: 3px dashed #888;
+        border-radius: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: #555;
+        background: #fff;
+        cursor: pointer;
+        transition: background 0.2s, border-color 0.2s;
+      }
+      #dropzone.hover {
+        background: #e8f2ff;
+        border-color: #1e90ff;
+        color: #1e90ff;
+      }
+      /* ---------- Player Layout ---------- */
+      #player {
+        width: 100%;
+        max-width: 700px;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      #seekbar {
+        flex: 1 1 auto;
+        height: 26px;
+        border-radius: 4px;
+        background: #ddd;
+        cursor: pointer;
+      }
+      #timeDisplay {
+        min-width: 140px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      button {
+        border: none;
+        background: #1e90ff;
+        color: #fff;
+        padding: 0.55rem 0.85rem;
+        border-radius: 6px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: opacity 0.15s;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      /* ---------- Range Slider Styling ---------- */
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 100px;
+        height: 6px;
+        border-radius: 3px;
+        background: #ccc;
+        outline: none;
+        cursor: pointer;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #1e90ff;
+        border: none;
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #1e90ff;
+        border: none;
+      }
+      /* ---------- Toggle Switch Styling ---------- */
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 24px;
+        vertical-align: middle;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #ccc;
+        border-radius: 24px;
+        transition: 0.2s;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        top: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: 0.2s;
+      }
+      .switch input:checked + .slider {
+        background: #1e90ff;
+      }
+      .switch input:checked + .slider:before {
+        transform: translateX(22px);
+      }
+      .control {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+      .loopLabel {
+        font-size: 0.9rem;
+      }
+      footer {
+        margin-top: 3rem;
+        font-size: 0.9rem;
+        color: #666;
+      }
+      footer a {
+        color: #1e90ff;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>WAV／OGG／MP3 オーディオループチェッカー</h1>
+    <p>ドラッグ＆ドロップまたはクリックで音楽ファイルを選択してください。</p>
+    <p style="font-size:0.9rem;color:#666;max-width:700px;text-align:center;">
+      ※ 本ツールはウェブブラウザ上で処理され、選択したファイルがサーバーへアップロードされることはありません。ご安心ください。<br>
+      ※ MP3ファイルは仕様上、先頭/末尾に数ミリ秒の無音が挿入されるため完全なシームレスループが困難です。<span aria-label="source">（参考： <a href="https://wiki.hydrogenaud.io/index.php?title=Gapless_playback" target="_blank" rel="noopener noreferrer">Hydrogenaudio&nbsp;Wiki</a>）</span>
+    </p>
+
+    <div id="dropzone">ここへファイルをドラッグ＆ドロップ or クリックしてファイル選択</div>
+
+    <div id="player" style="display: none;">
+      <button id="playPause" disabled>▶︎</button>
+      <canvas id="seekbar" width="480" height="20"></canvas>
+      <span id="timeDisplay">00:00 / 00:00</span>
+
+      <span class="control">
+        <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M3 10v4h4l5 5V5L7 10H3zM16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.06c1.48-.74 2.5-2.26 2.5-4.03zM14 3.23v2.06c3.39.49 6 3.39 6 6.71s-2.61 6.22-6 6.71v2.06c4.56-.52 8-4.37 8-8.77s-3.44-8.25-8-8.77z" fill="#1e90ff"/>
+        </svg>
+        <input id="volume" type="range" min="0" max="1" step="0.01" value="1" />
+      </span>
+
+      <span class="control">
+        <span class="loopLabel">Loop</span>
+        <label class="switch">
+          <input id="loopToggle" type="checkbox" checked />
+          <span class="slider"></span>
+        </label>
+      </span>
+    </div>
+
+    <input id="fileInput" type="file" accept="audio/*" hidden />
+
+    <script>
+      const dropzone = document.getElementById("dropzone");
+      const fileInput = document.getElementById("fileInput");
+      const player = document.getElementById("player");
+      const playPauseBtn = document.getElementById("playPause");
+      const seekbar = document.getElementById("seekbar");
+      const ctx = seekbar.getContext("2d");
+      const timeDisplay = document.getElementById("timeDisplay");
+      const volumeSlider = document.getElementById("volume");
+      const loopToggle = document.getElementById("loopToggle");
+
+      let audio = null;
+      let duration = 0;
+      let rafId = null;
+
+      // ---------- Drag & Drop Helpers ----------
+      ["dragenter", "dragover"].forEach((event) => {
+        dropzone.addEventListener(event, (e) => {
+          e.preventDefault();
+          dropzone.classList.add("hover");
+        });
+      });
+      ["dragleave", "drop"].forEach((event) => {
+        dropzone.addEventListener(event, (e) => {
+          e.preventDefault();
+          dropzone.classList.remove("hover");
+        });
+      });
+      dropzone.addEventListener("drop", (e) => {
+        const file = e.dataTransfer.files[0];
+        if (file) loadFile(file);
+      });
+      dropzone.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files[0]) loadFile(fileInput.files[0]);
+      });
+
+      // ---------- File Load ----------
+      function loadFile(file) {
+        if (audio) {
+          audio.pause();
+          cancelAnimationFrame(rafId);
+        }
+
+        audio = new Audio(URL.createObjectURL(file));
+        audio.loop = loopToggle.checked;
+        audio.volume = parseFloat(volumeSlider.value);
+        playPauseBtn.disabled = true;
+        playPauseBtn.textContent = "⏳";
+        player.style.display = "flex";
+
+        audio.addEventListener("loadedmetadata", () => {
+          duration = audio.duration;
+          timeDisplay.textContent = formatTime(0) + " / " + formatTime(duration);
+          drawSeekbar(0);
+          playPauseBtn.disabled = false;
+          playPauseBtn.textContent = "⏸";
+          audio.play(); // ---------- Autoplay ----------
+        });
+
+        audio.addEventListener("play", () => {
+          playPauseBtn.textContent = "⏸";
+          updateProgress();
+        });
+
+        audio.addEventListener("pause", () => {
+          playPauseBtn.textContent = "▶︎";
+          cancelAnimationFrame(rafId);
+        });
+
+        audio.addEventListener("ended", () => {
+          playPauseBtn.textContent = "▶︎";
+        });
+      }
+
+      // ---------- Controls ----------
+      playPauseBtn.addEventListener("click", () => {
+        if (!audio) return;
+        audio.paused ? audio.play() : audio.pause();
+      });
+
+      volumeSlider.addEventListener("input", () => {
+        if (audio) audio.volume = parseFloat(volumeSlider.value);
+      });
+
+      loopToggle.addEventListener("change", () => {
+        if (audio) audio.loop = loopToggle.checked;
+      });
+
+      // ---------- Seekbar Rendering ----------
+      function drawSeekbar(progress) {
+        const w = seekbar.width;
+        const h = seekbar.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = "#ccc";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#1e90ff";
+        ctx.fillRect(0, 0, w * progress, h);
+      }
+
+      function updateProgress() {
+        if (!audio) return;
+        const current = audio.currentTime % duration;
+        const progress = current / duration;
+        drawSeekbar(progress);
+        timeDisplay.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
+        rafId = requestAnimationFrame(updateProgress);
+      }
+
+      // ---------- Seek Interaction ----------
+      seekbar.addEventListener("click", (e) => {
+        if (!audio || !duration) return;
+        const rect = seekbar.getBoundingClientRect();
+        const ratio = (e.clientX - rect.left) / rect.width;
+        audio.currentTime = duration * ratio;
+        if (audio.paused) drawSeekbar(ratio);
+      });
+
+      // ---------- Utils ----------
+      function formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60)
+          .toString()
+          .padStart(2, "0");
+        return `${m}:${s}`;
+      }
+    </script>
+  </body>
+</html>
