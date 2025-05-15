@@ -175,8 +175,31 @@
         gap: 0.3rem;
         margin: 0.2rem 0;
       }
-      .loopLabel {
+      .loopLabel, .speedLabel {
         font-size: 0.9rem;
+      }
+      .speed-control {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        flex-wrap: nowrap;
+      }
+      #speedSlider {
+        width: 90px;
+      }
+      #speedValue {
+        font-weight: bold;
+        min-width: 2.2em;
+        display: inline-block;
+      }
+      #resetSpeed {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.4rem;
+        background: #888;
+        border-radius: 4px;
+      }
+      #resetSpeed:hover {
+        background: #1e90ff;
       }
       footer {
         margin-top: 3rem;
@@ -206,6 +229,13 @@
         .control {
           flex-basis: 45%;
           justify-content: center;
+        }
+        .speed-control {
+          flex-basis: 100%;
+          justify-content: center;
+        }
+        #resetSpeed {
+          padding: 0.25rem 0.4rem;
         }
         /* Arrange elements in a more mobile-friendly layout */
         #player {
@@ -254,6 +284,12 @@
           <span class="slider"></span>
         </label>
       </span>
+
+      <span class="control speed-control">
+        <span class="speedLabel">速度: <span id="speedValue">1.0x</span></span>
+        <input id="speedSlider" type="range" min="0.1" max="3" step="0.1" value="1" />
+        <button id="resetSpeed" title="1倍速に戻す">1x</button>
+      </span>
     </div>
 
     <input id="fileInput" type="file" accept="audio/*" hidden />
@@ -270,12 +306,16 @@
       const timeDisplay = document.getElementById('timeDisplay');
       const volumeSlider = document.getElementById('volume');
       const loopToggle = document.getElementById('loopToggle');
+      const speedSlider = document.getElementById('speedSlider');
+      const speedValue = document.getElementById('speedValue');
+      const resetSpeed = document.getElementById('resetSpeed');
 
       // Web Audio API objects
       let audioCtx = null;
       let gainNode = null;
       let audioBuffer = null;
       let source = null;
+      let playbackRate = 1.0;
 
       // Playback state
       let duration = 0;
@@ -313,6 +353,7 @@
         source = audioCtx.createBufferSource();
         source.buffer = audioBuffer;
         source.loop = loopToggle.checked;
+        source.playbackRate.value = playbackRate;
         source.connect(gainNode);
         startTime = audioCtx.currentTime - offset;
         source.start(0, offset);
@@ -325,7 +366,8 @@
         if(!audioBuffer) return;
         if(isPlaying){
           source.stop();
-          pauseOffset = audioCtx.currentTime - startTime;
+          // 再生速度を考慮した一時停止位置を計算
+          pauseOffset = playbackRate * (audioCtx.currentTime - startTime);
           isPlaying = false;
           playPauseBtn.textContent='▶︎';
         }else{
@@ -337,21 +379,68 @@
       volumeSlider.addEventListener('input',()=>{ if(gainNode) gainNode.gain.value = parseFloat(volumeSlider.value); });
       loopToggle.addEventListener('change',()=>{ if(source) source.loop = loopToggle.checked; });
 
+      // ---------- Playback Speed Control ----------
+      speedSlider.addEventListener('input', () => {
+        // 速度変更前の再生位置を保存
+        let currentPosition = 0;
+        if(isPlaying) {
+          currentPosition = playbackRate * (audioCtx.currentTime - startTime) % duration;
+        } else {
+          currentPosition = pauseOffset;
+        }
+
+        // 再生速度の更新
+        playbackRate = parseFloat(speedSlider.value);
+        speedValue.textContent = playbackRate.toFixed(1) + 'x';
+
+        // 再生中なら、現在の位置から新しい速度で再開
+        if(isPlaying) {
+          createAndStartSource(currentPosition);
+        }
+      });
+
+      resetSpeed.addEventListener('click', () => {
+        // 速度変更前の再生位置を保存
+        let currentPosition = 0;
+        if(isPlaying) {
+          currentPosition = playbackRate * (audioCtx.currentTime - startTime) % duration;
+        } else {
+          currentPosition = pauseOffset;
+        }
+
+        // 再生速度をリセット
+        playbackRate = 1.0;
+        speedSlider.value = 1;
+        speedValue.textContent = '1.0x';
+
+        // 再生中なら、現在の位置から新しい速度で再開
+        if(isPlaying) {
+          createAndStartSource(currentPosition);
+        }
+      });
+
       // ---------- Seekbar Interaction ----------
       seekbar.addEventListener('click',e=>{
         if(!audioBuffer) return;
         const rect = seekbar.getBoundingClientRect();
         const ratio = (e.clientX - rect.left) / rect.width;
+        // 再生位置をオーディオバッファー内の絶対位置として計算
         pauseOffset = ratio * duration;
-        if(isPlaying){ createAndStartSource(pauseOffset); }
-        else { drawSeekbar(ratio); timeDisplay.textContent = formatTime(pauseOffset)+' / '+formatTime(duration); }
+        if(isPlaying){
+          createAndStartSource(pauseOffset);
+        } else {
+          drawSeekbar(ratio);
+          timeDisplay.textContent = formatTime(pauseOffset)+' / '+formatTime(duration);
+        }
       });
 
       // ---------- Progress Rendering ----------
       let rafId=null;
       function updateProgress(){
         if(!isPlaying){ cancelAnimationFrame(rafId); return; }
-        const current = (audioCtx.currentTime - startTime) % duration;
+        // 再生速度を考慮した現在の再生位置を計算
+        const elapsedTime = audioCtx.currentTime - startTime;
+        const current = (playbackRate * elapsedTime) % duration;
         const progress = current / duration;
         drawSeekbar(progress);
         timeDisplay.textContent = formatTime(current)+' / '+formatTime(duration);
