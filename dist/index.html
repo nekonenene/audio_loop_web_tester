@@ -185,7 +185,7 @@
         flex-wrap: nowrap;
       }
       #speedSlider {
-        width: 90px;
+        width: 120px;
       }
       #speedValue {
         font-weight: bold;
@@ -286,8 +286,8 @@
       </span>
 
       <span class="control speed-control">
-        <span class="speedLabel">速度: <span id="speedValue">1.0x</span></span>
-        <input id="speedSlider" type="range" min="0.1" max="2" step="0.1" value="1" />
+        <span class="speedLabel">速度: <span id="speedValue">1.00x</span></span>
+        <input id="speedSlider" type="range" min="0.1" max="2" step="0.05" value="1" />
         <button id="resetSpeed" title="1倍速に戻す">1x</button>
       </span>
     </div>
@@ -443,7 +443,7 @@
 
         // 再生速度の更新
         playbackRate = parseFloat(speedSlider.value);
-        speedValue.textContent = playbackRate.toFixed(1) + 'x';
+        speedValue.textContent =  playbackRate.toFixed(2) + 'x';
 
         // 再生中なら、同じ位置から新しい速度で再開
         if (isPlaying) {
@@ -461,7 +461,7 @@
         // 再生速度をリセット
         playbackRate = 1.0;
         speedSlider.value = 1;
-        speedValue.textContent = '1.0x';
+        speedValue.textContent = '1.00x';
 
         // 再生中なら、同じ位置から新しい速度で再開
         if (isPlaying) {
